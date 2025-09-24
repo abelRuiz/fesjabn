@@ -122,9 +122,7 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
 <template>
   <Head title="Inscritos" />
   <Toast appendTo="body" position="top-right" />
-<button @click="toast.add({severity:'info', summary:'Test', detail:'Hola', life:2000})">
-  Probar Toast
-</button>
+
   <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
     <!-- Toolbar -->
     <div class="max-w-7xl mx-auto mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 items-center">
