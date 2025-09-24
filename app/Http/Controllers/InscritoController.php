@@ -13,22 +13,38 @@ class InscritoController extends Controller
 {
     public function index()
     {
-        $query = request('query');
-        $iglesia = request('iglesia');
+        $raw = trim((string) request('query', ''));   // lo que venga en ?query=
+        $iglesia = request('iglesia');                   // (si ya usas este filtro)
+        $ids = collect(preg_split('/[,\s;|]+/', $raw, -1, PREG_SPLIT_NO_EMPTY))
+            ->map(function ($v) {
+                return filter_var($v, FILTER_VALIDATE_INT) !== false ? (int) $v : null;
+        })
+        ->filter()       // quita nulls
+        ->unique()
+        ->values();
 
-        $inscritos = Inscrito::when($query, function ($q) use ($query) {
-                $q->where(function ($qq) use ($query) {
-                    $qq->where('nombre', 'like', "%{$query}%")
-                    ->orWhere('id', $query)
-                    ->orWhere('iglesia', 'like', "%{$query}%")
-                    ->orWhere('distrito', 'like', "%{$query}%");
+        $inscritos = Inscrito::query()
+        ->when($iglesia, fn ($q) => $q->where('iglesia', $iglesia))
+        ->when($ids->isNotEmpty(), function ($q) use ($ids) {
+            $q->whereIn('id', $ids);
+        }, function ($q) use ($raw) {
+            if ($raw !== '') {
+                $q->where(function ($qq) use ($raw) {
+                    $qq->where('nombre', 'like', "%{$raw}%")
+                       ->orWhere('iglesia', 'like', "%{$raw}%")
+                       ->orWhere('distrito', 'like', "%{$raw}%");
+
+                    // si el raw es numérico simple, también probar id exacto
+                    if (filter_var($raw, FILTER_VALIDATE_INT) !== false) {
+                        $qq->orWhere('id', (int) $raw);
+                    }
                 });
-            })
-            ->when($iglesia, fn ($q) => $q->where('iglesia', $iglesia))
-            ->orderBy('distrito')
-            ->orderBy('iglesia')
-            ->paginate(50)
-            ->withQueryString();
+            }
+        })
+        ->orderBy('distrito')
+        ->orderBy('iglesia')
+        ->paginate(50)
+        ->withQueryString();
 
         // lista para el select (únicos)
         $iglesias = Inscrito::select('iglesia')
@@ -40,7 +56,7 @@ class InscritoController extends Controller
 
         return Inertia::render('Inscritos', [
             'inscritos' => $inscritos,
-            'query'     => $query,
+            'query'     => $raw,
             'iglesia'   => $iglesia,
             'iglesias'  => $iglesias, // array simple
         ]);
