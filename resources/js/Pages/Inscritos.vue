@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, router, useForm, useRemember, usePage } from '@inertiajs/vue3'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 
@@ -13,8 +13,37 @@ const props = defineProps({
 
 const page = usePage()
 const toast = useToast()
-watch(() => page.props.flash?.success, (msg) => { if (msg) toast.add({ severity: 'success', summary: 'Listo', detail: msg, life: 2500 }) }, { immediate: true })
 
+function showErrors(errs) {
+  if (!errs) return
+  const list = Array.isArray(errs) ? errs : Object.values(errs).flat()
+  if (list.length) {
+    // asegurar que el Toast ya está montado
+    nextTick(() => {
+      toast.add({
+        severity: 'error',
+        summary: 'Validación',
+        detail: list.join('\n'),
+        life: 3500,
+      })
+    })
+  }
+}
+
+// 1) Muestra errores si llegan después (e.g. 422 de Inertia)
+watch(
+  () => page.props.errors,
+  (errs) => showErrors(errs),
+  { flush: 'post' } // <- dispara tras el render
+)
+
+// 2) Si venías de un 422, muéstralos al montar (por si 'immediate' corría muy pronto)
+onMounted(() => {
+  if (page.props?.errors && Object.keys(page.props.errors).length) {
+    // pequeño delay asegura que el <Toast> ya está suscrito
+    setTimeout(() => showErrors(page.props.errors), 0)
+  }
+})
 // --- estado ---
 const search = ref(props.query ?? '')
 const iglesiaFilter = ref(props.iglesia ?? '') // ← filtro iglesia
@@ -92,8 +121,10 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
 
 <template>
   <Head title="Inscritos" />
-  <Toast />
-
+  <Toast appendTo="body" position="top-right" />
+<button @click="toast.add({severity:'info', summary:'Test', detail:'Hola', life:2000})">
+  Probar Toast
+</button>
   <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
     <!-- Toolbar -->
     <div class="max-w-7xl mx-auto mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 items-center">

@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Inertia\Inertia;
 use App\Models\Inscrito;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class InscritoController extends Controller
 {
@@ -43,18 +46,82 @@ class InscritoController extends Controller
         ]);
     }
 
-
     public function update(Request $request)
     {
-        $request->validate([
-            'action' => ['required', 'string', 'in:entrada,salida'],
-            'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['required', 'exists:inscritos,id']
-        ]);
+        // 1) Validación base
+        $baseRules = [
+            'action' => ['required', 'string', Rule::in(['entrada','salida'])],
+            'ids'    => ['required', 'array', 'min:1'],
+            'ids.*'  => ['required', 'integer', Rule::exists('inscritos', 'id')],
+        ];
 
-        Inscrito::whereIn('id', $request->ids)
-            ->update([$request->action => now()]);
+        $validator = Validator::make($request->all(), $baseRules);
+
+        // 2) Validación de estado según acción (en bloque)
+        $validator->after(function ($v) use ($request) {
+            $ids = collect($request->input('ids', []))
+                ->map(fn($id) => (int)$id)->filter();
+
+            if ($ids->isEmpty()) return;
+
+            if ($request->action === 'entrada') {
+                // Bloquear si YA está adentro: entrada != null && salida == null
+                $yaAdentro = Inscrito::whereIn('id', $ids)
+                    ->whereNotNull('entrada')
+                    ->whereNull('salida')
+                    ->pluck('id');
+
+                if ($yaAdentro->isNotEmpty()) {
+                    $v->errors()->add('ids', 'Algunos inscritos ya están ADENTRO. IDs: '.$yaAdentro->implode(', '));
+                }
+            } else { // salida
+                // Permitir salida SOLO si está adentro: entrada != null && salida == null
+                $noAdentro = Inscrito::whereIn('id', $ids)
+                    ->where(function ($q) {
+                        $q->whereNull('entrada')   // nunca entró
+                        ->orWhereNotNull('salida'); // ya salió
+                    })
+                    ->pluck('id');
+
+                if ($noAdentro->isNotEmpty()) {
+                    $v->errors()->add('ids', 'Algunos inscritos NO están ADENTRO. IDs: '.$noAdentro->implode(', '));
+                }
+            }
+        });
+
+        if ($validator->fails()) {
+            return back()->withErrors($validator)->withInput();
+        }
+
+        $action = $request->action;
+        $ids    = $request->ids;
+
+        // 3) Update con filtros (transacción)
+        DB::transaction(function () use ($action, $ids) {
+            if ($action === 'entrada') {
+                // Nuevo ciclo: permitir si estaba "afuera" (salida != null) o "no llegó" (ambas null)
+                Inscrito::whereIn('id', $ids)
+                    ->where(function ($q) {
+                        $q->whereNull('entrada')        // no llegó
+                        ->orWhereNotNull('salida');   // afuera
+                    })
+                    ->update([
+                        'entrada' => now(),
+                        'salida'  => null,  // al entrar, limpia salida
+                    ]);
+            } else { // salida
+                // Cierre de ciclo: solo si está adentro (entrada != null && salida == null)
+                Inscrito::whereIn('id', $ids)
+                    ->whereNotNull('entrada')
+                    ->whereNull('salida')
+                    ->update([
+                        'salida'  => now(),
+                        'entrada' => null,
+                    ]);
+            }
+        });
 
         return redirect()->route('inscritos.index')->with('success', 'Actualizado');
     }
+
 }
