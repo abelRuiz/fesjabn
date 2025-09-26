@@ -9,6 +9,7 @@ const props = defineProps({
   query: { type: [String, null], default: null },
   iglesia: { type: [String, null], default: null },
   iglesias: { type: Array, default: () => [] }, // lista para el select
+  status: { type: [String, null], default: ''}
 })
 
 const page = usePage()
@@ -48,7 +49,7 @@ onMounted(() => {
 const search = ref(props.query ?? '')
 const iglesiaFilter = ref(props.iglesia ?? '') // ← filtro iglesia
 const selectedIds = useRemember([], 'inscritos:selected')
-
+const statusFilter = ref(props.status ?? '')
 // cache + helpers (igual que antes)
 const selectedCache = ref({})
 watch(() => props.inscritos.data, (rows) => {
@@ -90,6 +91,7 @@ function applyFilters(replace = true) {
       query: search.value || undefined,
       iglesia: iglesiaFilter.value || undefined,
       page: undefined, // reset de paginación al cambiar filtro/texto
+      status: statusFilter.value || undefined
     },
     { preserveState: true, preserveScroll: true, replace }
   )
@@ -98,6 +100,7 @@ function applyFilters(replace = true) {
 let t = null
 watch(search, () => { clearTimeout(t); t = setTimeout(() => applyFilters(true), 350) })
 watch(iglesiaFilter, () => applyFilters(false)) // cambio inmediato al seleccionar iglesia
+watch(statusFilter, () => applyFilters(false)) // cambio inmediato al seleccionar iglesia
 
 // acciones (igual)
 const form = useForm({ action: '', ids: [] })
@@ -125,7 +128,7 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
 
   <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
     <!-- Toolbar -->
-    <div class="max-w-7xl mx-auto mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 items-center">
+    <div class="max-w-7xl mx-auto mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-4 items-center">
       <!-- buscador -->
       <input
         type="text"
@@ -142,6 +145,16 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
       >
         <option value="">Todas las iglesias</option>
         <option v-for="ig in iglesias" :key="ig" :value="ig">{{ ig }}</option>
+      </select>
+
+    <select
+        v-model="statusFilter"
+        class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-800"
+        title="Filtrar por iglesia"
+      >
+        <option value="">Todos</option>
+        <option value="entrada">Con entrada</option>
+        <option value="salida">Sin entrada</option>
       </select>
 
       <!-- botones -->

@@ -14,7 +14,9 @@ class InscritoController extends Controller
     public function index()
     {
         $raw = trim((string) request('query', ''));   // lo que venga en ?query=
-        $iglesia = request('iglesia');                   // (si ya usas este filtro)
+        $iglesia = request('iglesia');
+        $status = request()->input('status',false);
+                 // (si ya usas este filtro)
         $ids = collect(preg_split('/[,\s;|]+/', $raw, -1, PREG_SPLIT_NO_EMPTY))
             ->map(function ($v) {
                 return filter_var($v, FILTER_VALIDATE_INT) !== false ? (int) $v : null;
@@ -24,6 +26,14 @@ class InscritoController extends Controller
         ->values();
 
         $inscritos = Inscrito::query()
+        ->when($status, function($query) use ($status) {
+            if ($status == 'entrada') {
+                $query->whereNotNull('entrada');
+            }
+            if ($status == 'salida') {
+                $query->whereNotNull('salida');
+            }
+        })
         ->when($iglesia, fn ($q) => $q->where('iglesia', $iglesia))
         ->when($ids->isNotEmpty(), function ($q) use ($ids) {
             $q->whereIn('id', $ids);
