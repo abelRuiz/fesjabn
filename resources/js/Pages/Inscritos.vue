@@ -9,7 +9,8 @@ const props = defineProps({
   query: { type: [String, null], default: null },
   iglesia: { type: [String, null], default: null },
   iglesias: { type: Array, default: () => [] }, // lista para el select
-  status: { type: [String, null], default: ''}
+  status: { type: [String, null], default: ''},
+  distritos: { type: Array, default: () => [] }, // lista para el select
 })
 
 const page = usePage()
@@ -50,6 +51,7 @@ const search = ref(props.query ?? '')
 const iglesiaFilter = ref(props.iglesia ?? '') // ← filtro iglesia
 const selectedIds = useRemember([], 'inscritos:selected')
 const statusFilter = ref(props.status ?? '')
+const distritoFilter = ref(props.distrito ?? '')
 // cache + helpers (igual que antes)
 const selectedCache = ref({})
 watch(() => props.inscritos.data, (rows) => {
@@ -91,16 +93,19 @@ function applyFilters(replace = true) {
       query: search.value || undefined,
       iglesia: iglesiaFilter.value || undefined,
       page: undefined, // reset de paginación al cambiar filtro/texto
-      status: statusFilter.value || undefined
+      status: statusFilter.value || undefined,
+      distrito: distritoFilter.value || undefined,
     },
     { preserveState: true, preserveScroll: true, replace }
   )
 }
 
+
 let t = null
 watch(search, () => { clearTimeout(t); t = setTimeout(() => applyFilters(true), 350) })
 watch(iglesiaFilter, () => applyFilters(false)) // cambio inmediato al seleccionar iglesia
 watch(statusFilter, () => applyFilters(false)) // cambio inmediato al seleccionar iglesia
+watch(distritoFilter, () => applyFilters(false)) // cambio inmediato al seleccionar distrito
 
 // acciones (igual)
 const form = useForm({ action: '', ids: [] })
@@ -136,6 +141,15 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
         placeholder="Buscar por ID, nombre, iglesia o distrito…"
         class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-800"
       />
+
+      <select
+        v-model="distritoFilter"
+        class="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white/90 dark:bg-gray-800"
+        title="Filtrar por distrito"
+      >
+        <option value="">Todos los distritos</option>
+        <option v-for="d in distritos" :key="d" :value="d">{{ d }}</option>
+      </select>
 
       <!-- select iglesia -->
       <select
@@ -227,7 +241,7 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
               <th class="px-4 py-2 text-left">id</th>
               <th class="px-4 py-2 text-left">Nombre</th>
               <th class="px-4 py-2 text-left">Distrito/Iglesia</th>
-              <th class="px-4 py-2 text-left">Pago comida</th>
+              <th class="px-4 py-2 text-left">Precio</th>
               <th class="px-4 py-2 text-left">Nom. Director</th>
               <th class="px-4 py-2 text-left">Ultima entrada</th>
               <th class="px-4 py-2 text-left">Ultima salida</th>
@@ -248,20 +262,23 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
                 />
               </td>
               <td class="px-4 py-2">{{ inscrito.id }}</td>
-              <td class="px-4 py-2">{{ inscrito.nombre }}</td>
+              <td class="px-4 py-2">{{ inscrito.nombre }} <br>
+                <small>{{ inscrito.edad }}</small>
+
+              </td>
               <td class="px-4 py-2">
                 {{ inscrito.distrito }}<br />
                 <small class="text-gray-500 dark:text-gray-400">{{ inscrito.iglesia }}</small>
               </td>
-              <td class="px-4 py-2">{{ inscrito.comida ?? '-' }}</td>
+              <td class="px-4 py-2">{{ inscrito.precio }}</td>
               <td class="px-4 py-2">
                 {{ inscrito.director ?? '-' }}<br />
                 <small class="text-gray-500 dark:text-gray-400">
                   {{ inscrito.telefono ?? '-' }}<span v-if="inscrito.telefono && inscrito.email"> | </span>{{ inscrito.email ?? '' }}
                 </small>
               </td>
-              <td class="px-4 py-2">{{ inscrito.entrada ?? '-' }}</td>
-              <td class="px-4 py-2">{{ inscrito.salida ?? '-' }}</td>
+              <td class="px-4 py-2">{{ inscrito.last_checkin_entrada?.created_at ?? '-' }}</td>
+              <td class="px-4 py-2">{{ inscrito.last_checkin_salida?.created_at ?? '-' }}</td>
             </tr>
 
             <tr v-if="props.inscritos.data.length === 0">

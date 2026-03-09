@@ -15,14 +15,19 @@ return new class extends Migration
             $table->id();
             $table->timestamps();
             $table->string('nombre');
-            $table->string('distrito');
-            $table->string('iglesia');
-            $table->string('comida')->nullable();
-            $table->dateTime('entrada')->nullable();
-            $table->dateTime('salida')->nullable();
+            $table->string('edad')->nullable();
+            $table->string('distrito')->nullable();
+            $table->string('iglesia')->nullable();
+            $table->string('asiste_como')->nullable();
+            $table->string('bautizado')->nullable();
             $table->string('director')->nullable();
             $table->string('telefono')->nullable();
             $table->string('email')->nullable();
+            $table->string('tipo_sangre')->nullable();
+            $table->text('enfermedad')->nullable();
+            $table->text('medicamento')->nullable();
+            $table->text('alergia')->nullable();
+            $table->string('precio')->nullable();
         });
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Inertia\Inertia;
+use App\Models\Checkin;
 use App\Models\Inscrito;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,7 @@ class InscritoController extends Controller
     {
         $raw = trim((string) request('query', ''));   // lo que venga en ?query=
         $iglesia = request('iglesia');
+        $distrito = request('distrito');
         $status = request()->input('status',false);
                  // (si ya usas este filtro)
         $ids = collect(preg_split('/[,\s;|]+/', $raw, -1, PREG_SPLIT_NO_EMPTY))
@@ -26,14 +28,16 @@ class InscritoController extends Controller
         ->values();
 
         $inscritos = Inscrito::query()
+        ->with([
+            'lastCheckinEntrada',
+            'lastCheckinSalida'
+        ])
         ->when($status, function($query) use ($status) {
-            if ($status == 'entrada') {
-                $query->whereNotNull('entrada');
-            }
-            if ($status == 'salida') {
-                $query->whereNotNull('salida');
-            }
+           $query->whereHas('checkins', function($q) use ($status) {
+               $q->where('tipo', $status);
+           });
         })
+        ->when($distrito, fn ($q) => $q->where('distrito', $distrito))
         ->when($iglesia, fn ($q) => $q->where('iglesia', $iglesia))
         ->when($ids->isNotEmpty(), function ($q) use ($ids) {
             $q->whereIn('id', $ids);
@@ -53,7 +57,7 @@ class InscritoController extends Controller
         })
         ->orderBy('distrito')
         ->orderBy('iglesia')
-        ->paginate(50)
+        ->paginate(100)
         ->withQueryString();
 
         // lista para el select (únicos)
@@ -63,12 +67,19 @@ class InscritoController extends Controller
             ->groupBy('iglesia')
             ->orderBy('iglesia')
             ->pluck('iglesia');
-
+        $distritos = Inscrito::select('distrito')
+            ->whereNotNull('distrito')
+            ->where('distrito', '!=', '')
+            ->groupBy('distrito')
+            ->orderBy('distrito')
+            ->pluck('distrito');
+        
         return Inertia::render('Inscritos', [
             'inscritos' => $inscritos,
             'query'     => $raw,
             'iglesia'   => $iglesia,
             'iglesias'  => $iglesias, // array simple
+            'distritos' => $distritos,
         ]);
     }
 
@@ -91,21 +102,22 @@ class InscritoController extends Controller
             if ($ids->isEmpty()) return;
 
             if ($request->action === 'entrada') {
-                // Bloquear si YA está adentro: entrada != null && salida == null
-                $yaAdentro = Inscrito::whereIn('id', $ids)
-                    ->whereNotNull('entrada')
-                    ->whereNull('salida')
-                    ->pluck('id');
+                // Bloquear si YA está adentro: buscar su ultimo checkin y que sea entrada
 
+                $yaAdentro = Inscrito::whereIn('id', $ids)
+                    ->whereHas('checkinActual', function ($q) {
+                        $q->where('tipo', 'entrada');
+                    })
+                    ->pluck('id');
+                   // dd($yaAdentro);
                 if ($yaAdentro->isNotEmpty()) {
                     $v->errors()->add('ids', 'Algunos inscritos ya están ADENTRO. IDs: '.$yaAdentro->implode(', '));
                 }
             } else { // salida
-                // Permitir salida SOLO si está adentro: entrada != null && salida == null
+                // Bloquear si su ultimo checkin es salida
                 $noAdentro = Inscrito::whereIn('id', $ids)
-                    ->where(function ($q) {
-                        $q->whereNull('entrada')   // nunca entró
-                        ->orWhereNotNull('salida'); // ya salió
+                    ->whereHas('checkinActual', function ($q) {
+                        $q->where('tipo', 'salida');
                     })
                     ->pluck('id');
 
@@ -125,25 +137,24 @@ class InscritoController extends Controller
         // 3) Update con filtros (transacción)
         DB::transaction(function () use ($action, $ids) {
             if ($action === 'entrada') {
-                // Nuevo ciclo: permitir si estaba "afuera" (salida != null) o "no llegó" (ambas null)
-                Inscrito::whereIn('id', $ids)
-                    ->where(function ($q) {
-                        $q->whereNull('entrada')        // no llegó
-                        ->orWhereNotNull('salida');   // afuera
-                    })
-                    ->update([
-                        'entrada' => now(),
-                        'salida'  => null,  // al entrar, limpia salida
+                // insertar entrada en tabla de checkins
+                foreach ($ids as $id) {
+                    Checkin::create([
+                        'inscrito_id' => $id,
+                        'tipo' => 'entrada',
+                        'fecha' => now(),
                     ]);
+                }
+                    
             } else { // salida
                 // Cierre de ciclo: solo si está adentro (entrada != null && salida == null)
-                Inscrito::whereIn('id', $ids)
-                    ->whereNotNull('entrada')
-                    ->whereNull('salida')
-                    ->update([
-                        'salida'  => now(),
-                        'entrada' => null,
+                foreach ($ids as $id) {
+                    Checkin::create([
+                        'inscrito_id' => $id,
+                        'tipo' => 'salida',
+                        'fecha' => now(),
                     ]);
+                }
             }
         });
 
