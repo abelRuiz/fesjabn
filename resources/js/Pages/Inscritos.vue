@@ -125,11 +125,56 @@ function submitAction(action) {
 }
 
 const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCache.value[id]).filter(Boolean))
+
+function formatDate(dateString) {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  if (isNaN(d.getTime())) return dateString
+
+  const dia = String(d.getDate()).padStart(2, '0')
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const ano = d.getFullYear()
+  const hora = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  
+  return `${dia}-${mes}-${ano} ${hora}:${min}`
+}
 </script>
 
 <template>
   <Head title="Inscritos" />
   <Toast appendTo="body" position="top-right" />
+
+  <!-- Navbar FESJA -->
+  <nav class="top-0 z-50 bg-white dark:bg-gray-800 shadow border-b border-gray-200 dark:border-gray-700">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex">
+          <div class="shrink-0 flex items-center">
+            <Link :href="route('inscritos.index')" class="text-xl font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500">
+              FESJA BC 2026
+            </Link>
+          </div>
+        </div>
+        <div class="flex items-center">
+          <span v-if="$page.props.auth?.user" class="text-sm text-gray-700 dark:text-gray-300 mr-4 font-medium">
+            {{ $page.props.auth.user.name }}
+          </span>
+          <Link
+            v-if="$page.props.auth?.user"
+            :href="route('logout')"
+            method="post"
+              as="button"
+            class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+          >
+            Cerrar sesión
+          </Link>
+        </div>
+      </div>
+    </div>
+  </nav>
+    
+  
 
   <div class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-6">
     <!-- Toolbar -->
@@ -238,11 +283,11 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
               <th class="px-4 py-2 text-left w-10">
                 <input type="checkbox" :checked="allOnPageSelected" @change="toggleAllOnPage" />
               </th>
-              <th class="px-4 py-2 text-left">id</th>
+              <th class="px-4 py-2 text-left hidden sm:table-cell">id</th>
               <th class="px-4 py-2 text-left">Nombre</th>
               <th class="px-4 py-2 text-left">Distrito/Iglesia</th>
-              <th class="px-4 py-2 text-left">Precio</th>
-              <th class="px-4 py-2 text-left">Nom. Director</th>
+              <th class="px-4 py-2 text-left hidden md:table-cell">Precio</th>
+              <th class="px-4 py-2 text-left hidden md:table-cell">Nom. Director</th>
               <th class="px-4 py-2 text-left">Ultima entrada</th>
               <th class="px-4 py-2 text-left">Ultima salida</th>
             </tr>
@@ -261,7 +306,7 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
                   @change="toggleOne(inscrito, $event)"
                 />
               </td>
-              <td class="px-4 py-2">{{ inscrito.id }}</td>
+              <td class="px-4 py-2 hidden sm:table-cell">{{ inscrito.id }}</td>
               <td class="px-4 py-2">{{ inscrito.nombre }} <br>
                 <small>{{ inscrito.edad }}</small>
 
@@ -270,15 +315,15 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
                 {{ inscrito.distrito }}<br />
                 <small class="text-gray-500 dark:text-gray-400">{{ inscrito.iglesia }}</small>
               </td>
-              <td class="px-4 py-2">{{ inscrito.precio }}</td>
-              <td class="px-4 py-2">
+              <td class="px-4 py-2 hidden md:table-cell">{{ inscrito.precio }}</td>
+              <td class="px-4 py-2 hidden md:table-cell">
                 {{ inscrito.director ?? '-' }}<br />
                 <small class="text-gray-500 dark:text-gray-400">
                   {{ inscrito.telefono ?? '-' }}<span v-if="inscrito.telefono && inscrito.email"> | </span>{{ inscrito.email ?? '' }}
                 </small>
               </td>
-              <td class="px-4 py-2">{{ inscrito.last_checkin_entrada?.created_at ?? '-' }}</td>
-              <td class="px-4 py-2">{{ inscrito.last_checkin_salida?.created_at ?? '-' }}</td>
+              <td class="px-4 py-2">{{ formatDate(inscrito.last_checkin_entrada?.created_at) }}</td>
+              <td class="px-4 py-2">{{ formatDate(inscrito.last_checkin_salida?.created_at) }}</td>
             </tr>
 
             <tr v-if="props.inscritos.data.length === 0">
@@ -291,11 +336,11 @@ const selectedPanelRows = computed(() => selectedIds.value.map(id => selectedCac
       </div>
 
       <!-- paginación -->
-      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row gap-4 sm:gap-0 items-center justify-between">
         <div class="text-sm text-gray-500">
           Mostrando {{ props.inscritos.from ?? 0 }}–{{ props.inscritos.to ?? 0 }} de {{ props.inscritos.total }}
         </div>
-        <div class="flex gap-1">
+        <div class="flex flex-wrap justify-center gap-1">
           <Link
             v-for="link in props.inscritos.links"
             :key="link.url ?? link.label"
