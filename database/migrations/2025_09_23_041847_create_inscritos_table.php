@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('inscritos', function (Blueprint $table) {
             $table->id();
             $table->timestamps();
-            $table->string('nombre');
+            $table->string('nombre')->nullable();
             $table->string('edad')->nullable();
             $table->string('distrito')->nullable();
             $table->string('iglesia')->nullable();

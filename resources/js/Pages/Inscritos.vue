@@ -308,7 +308,7 @@ function formatDate(dateString) {
               </td>
               <td class="px-4 py-2 hidden sm:table-cell">{{ inscrito.id }}</td>
               <td class="px-4 py-2">{{ inscrito.nombre }} <br>
-                <small>{{ inscrito.edad }}</small>
+                <small>Edad:{{ inscrito.edad }}</small> | <small>{{ inscrito.asiste_como }}</small>
 
               </td>
               <td class="px-4 py-2">

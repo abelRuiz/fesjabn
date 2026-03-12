@@ -78,6 +78,7 @@ class InscritoController extends Controller
             'inscritos' => $inscritos,
             'query'     => $raw,
             'iglesia'   => $iglesia,
+            'distrito'  => $distrito,
             'iglesias'  => $iglesias, // array simple
             'distritos' => $distritos,
         ]);
