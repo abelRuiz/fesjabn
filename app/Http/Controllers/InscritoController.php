@@ -18,6 +18,11 @@ class InscritoController extends Controller
         $iglesia = request('iglesia');
         $distrito = request('distrito');
         $status = request()->input('status',false);
+
+        $entrada = false;
+        if ($status) {
+            $entrada = ($status == 'entrada') ? true : false;
+        }
                  // (si ya usas este filtro)
         $ids = collect(preg_split('/[,\s;|]+/', $raw, -1, PREG_SPLIT_NO_EMPTY))
             ->map(function ($v) {
@@ -32,10 +37,14 @@ class InscritoController extends Controller
             'lastCheckinEntrada',
             'lastCheckinSalida'
         ])
-        ->when($status, function($query) use ($status) {
-           $query->whereHas('checkins', function($q) use ($status) {
-               $q->where('tipo', $status);
-           });
+        ->when($status, function($query) use ($status, $entrada) {
+            if($entrada){
+                $query->whereHas('checkins', function($q) use ($status) {
+                    $q->where('tipo', $status);
+                });
+            }else{
+                $query->whereDoesntHave('checkins');
+            }
         })
         ->when($distrito, fn ($q) => $q->where('distrito', $distrito))
         ->when($iglesia, fn ($q) => $q->where('iglesia', $iglesia))
